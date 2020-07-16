@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include "libhttp.h"
 #include "wq.h"
@@ -30,7 +31,6 @@ int server_port;  // Default value: 8000
 char *server_files_directory;
 char *server_proxy_hostname;
 int server_proxy_port;
-
 
 /*
  * Serves the contents the file stored at `path` to the client socket `fd`.
@@ -62,22 +62,54 @@ void serve_file(int fd, char *path, off_t file_size) {
   /* PART 2 END */
 }
 
-void serve_directory(int fd, char *path) {
-  http_start_response(fd, 200);
-  http_send_header(fd, "Content-Type", http_get_mime_type(".html"));
-  http_end_headers(fd);
+//checks if a directory contains an index.html file
+bool contains_index_html(DIR *directory) {
+  struct dirent *entry = readdir(directory);
+  while (entry != NULL) {
+    if (strcmp(entry->d_name, "index.html") == 0) {
+      return true;
+    }
+    entry = readdir(directory);
+  }
+  return false;
+}
 
+void serve_directory(int fd, char *path) {
   /* TODO: PART 3 */
   /* PART 3 BEGIN */
 
   // TODO: Open the directory (Hint: opendir() may be useful here)
+  DIR *directory = opendir(path);
+  char *file_path = (char *) malloc(sizeof(path) + 4000);
 
   /**
    * TODO: For each entry in the directory (Hint: look at the usage of readdir() ),
    * send a string containing a properly formatted HTML. (Hint: the http_format_href()
    * function in libhttp.c may be useful here)
    */
+  if (contains_index_html(directory)) {
+    struct stat file_info;
+    http_format_index(file_path, path);
+    stat(file_path, &file_info);
+    serve_file(fd, file_path, file_info.st_size);
+  } else {
+    http_start_response(fd, 200);
+    http_send_header(fd, "Content-Type", http_get_mime_type(".html"));
+    http_end_headers(fd);
+    http_send_header(fd, "<h2>Index of", path);
+    char *header = "</h2><br>\n";
+    write(fd, header, strlen(header));
 
+    struct dirent *entry = readdir(directory);
+    
+    while (entry != NULL) {
+      http_format_href(file_path, path, entry->d_name);
+      write(fd, file_path, strlen(file_path));
+      entry = readdir(directory);
+    }
+  }
+  free(file_path);
+  closedir(directory);
   /* PART 3 END */
 }
 
@@ -134,10 +166,12 @@ void handle_files_request(int fd) {
   /* PART 2 & 3 BEGIN */
   struct stat file_info;
   stat(path, &file_info);
-  if (!S_ISREG(file_info.st_mode)) {
-    http_start_response(fd, 404);
-  } else {
+  if (S_ISREG(file_info.st_mode)) {
     serve_file(fd, path, file_info.st_size);
+  } else if (S_ISDIR(file_info.st_mode)){
+    serve_directory(fd, path);
+  } else {
+    http_start_response(fd, 404);
   }
 
   close(fd);
