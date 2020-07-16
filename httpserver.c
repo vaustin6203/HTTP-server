@@ -97,6 +97,7 @@ void serve_directory(int fd, char *path) {
     http_send_header(fd, "Content-Type", http_get_mime_type(".html"));
     http_end_headers(fd);
 
+    rewinddir(directory);
     struct dirent *entry = readdir(directory);
     
     while (entry != NULL) {
