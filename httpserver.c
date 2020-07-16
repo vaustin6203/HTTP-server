@@ -96,9 +96,6 @@ void serve_directory(int fd, char *path) {
     http_start_response(fd, 200);
     http_send_header(fd, "Content-Type", http_get_mime_type(".html"));
     http_end_headers(fd);
-    http_send_header(fd, "<h2>Index of", path);
-    char *header = "</h2><br>\n";
-    write(fd, header, strlen(header));
 
     struct dirent *entry = readdir(directory);
     
@@ -107,6 +104,9 @@ void serve_directory(int fd, char *path) {
       write(fd, file_path, strlen(file_path));
       entry = readdir(directory);
     }
+
+    http_format_href(file_path, path, "");
+    write(fd, file_path, strlen(file_path));
   }
   free(file_path);
   closedir(directory);
