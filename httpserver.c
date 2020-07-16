@@ -31,6 +31,8 @@ char *server_files_directory;
 char *server_proxy_hostname;
 int server_proxy_port;
 
+#define LIBHTTP_REQUEST_MAX_SIZE 8192
+
 /*
  * Serves the contents the file stored at `path` to the client socket `fd`.
  * It is the caller's reponsibility to ensure that the file stored at `path` exists.
@@ -39,13 +41,25 @@ void serve_file(int fd, char *path) {
 
   /* TODO: PART 2 */
   /* PART 2 BEGIN */
+  char buffer[LIBHTTP_REQUEST_MAX_SIZE];
+
+  int file_fd = open(path, O_RDONLY);
+
+  int bytes_read = read(file_fd, buffer, sizeof(buffer));
+  close(file_fd);
+
+  size_t size = snprintf(NULL, 0, "%d", bytes_read) + 1;  //get size needed to convert length to string
+  char str_length[size];
+  snprintf(str_length, sizeof(str_length), "%d", bytes_read);    //convert int to string
 
   http_start_response(fd, 200);
   http_send_header(fd, "Content-Type", http_get_mime_type(path));
-  http_send_header(fd, "Content-Length", "0"); // TODO: change this line too
+  http_send_header(fd, "Content-Length", str_length); // TODO: change this line too
   http_end_headers(fd);
 
-
+  //buffer[bytes_read] = '\0';
+  write(fd, buffer, bytes_read);
+  
   /* PART 2 END */
 }
 
@@ -119,8 +133,13 @@ void handle_files_request(int fd) {
    */
 
   /* PART 2 & 3 BEGIN */
-
-  /* PART 2 & 3 END */
+  struct stat file_info;
+  stat(path, &file_info);
+  if (!S_ISREG(file_info.st_mode)) {
+    http_start_response(fd, 404);
+  } else {
+    serve_file(fd, path);
+  }
 
   close(fd);
   return;
@@ -267,7 +286,15 @@ void serve_forever(int *socket_number, void (*request_handler)(int)) {
    */
 
   /* PART 1 BEGIN */
+  if (bind(*socket_number, (struct sockaddr *) &server_address, sizeof(server_address)) == -1) {
+    perror("Bind failed");
+    exit(errno);
+  }
 
+  if (listen(*socket_number, 1024) == -1) {
+    perror("Failed to listen");
+    exit(errno);
+  }
   /* PART 1 END */
   printf("Listening on port %d...\n", server_port);
 
