@@ -31,17 +31,16 @@ char *server_files_directory;
 char *server_proxy_hostname;
 int server_proxy_port;
 
-#define LIBHTTP_REQUEST_MAX_SIZE 8192
 
 /*
  * Serves the contents the file stored at `path` to the client socket `fd`.
  * It is the caller's reponsibility to ensure that the file stored at `path` exists.
  */
-void serve_file(int fd, char *path) {
+void serve_file(int fd, char *path, off_t file_size) {
 
   /* TODO: PART 2 */
   /* PART 2 BEGIN */
-  char buffer[LIBHTTP_REQUEST_MAX_SIZE];
+  char buffer[file_size];
 
   int file_fd = open(path, O_RDONLY);
 
@@ -138,7 +137,7 @@ void handle_files_request(int fd) {
   if (!S_ISREG(file_info.st_mode)) {
     http_start_response(fd, 404);
   } else {
-    serve_file(fd, path);
+    serve_file(fd, path, file_info.st_size);
   }
 
   close(fd);
