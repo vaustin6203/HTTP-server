@@ -179,6 +179,28 @@ void handle_files_request(int fd) {
   return;
 }
 
+struct proxy_fd {
+  int my_fd;
+  int other_fd;
+};
+
+void *run_socket(void *arg) {
+  struct proxy_fd *pf = (struct proxy_fd *) arg;
+  char buffer[65535];
+  int bytes_read;
+  int bytes_written;
+
+  while ((bytes_read = read(pf->other_fd, buffer, sizeof(buffer))) > 0 ) {
+    if (bytes_read > 0) {
+        if ((bytes_written = write(pf->my_fd, buffer, bytes_read)) < 0) {
+          close(pf->my_fd);
+          close(pf->other_fd);
+          pthread_exit();
+        }
+    }
+  }
+}
+
 /*
  * Opens a connection to the proxy target (hostname=server_proxy_hostname and
  * port=server_proxy_port) and relays traffic to/from the stream fd and the
@@ -243,6 +265,22 @@ void handle_proxy_request(int fd) {
 
   /* TODO: PART 4 */
   /* PART 4 BEGIN */
+  pid_t target_id;
+  pid_t client_id;
+
+  struct proxy_fd *target_struct = malloc(sizeof(struct proxy_fd));
+  target_struct->my_fd = target_fd;
+  target_struct->other_fd = fd;
+
+  struct proxy_fd *client_struct = malloc(sizeof(struct proxy_fd));
+  target_struct->my_fd = fd;
+  target_struct->other_fd = target_fd;
+
+  pthread_create(&target_id, NULL, run_socket, (void *) target_struct);
+  pthread_create(&client_id, NULL, run_socet, (void *) client_struct);
+
+  pthread_join(target_id, NULL);
+  pthread_join(client_id, NULL);
 
   /* PART 4 END */
 
