@@ -19,6 +19,8 @@
 #include "libhttp.h"
 #include "wq.h"
 
+int socket_OK = 0;
+
 /*
  * Global configuration variables.
  * You need to use these in your implementation of handle_files_request and
@@ -181,24 +183,21 @@ void handle_files_request(int fd) {
 
 struct proxy_fd {
   int my_fd;
-  int other_fd;
+  char other_fd;
 };
 
 void *run_socket(void *arg) {
   struct proxy_fd *pf = (struct proxy_fd *) arg;
   char buffer[65535];
-  int bytes_read;
-  int bytes_written;
+  int bytes_read = 0;
+  int bytes_written = 0;
 
-  while ((bytes_read = read(pf->other_fd, buffer, sizeof(buffer))) > 0 ) {
-    if (bytes_read > 0) {
-        if ((bytes_written = write(pf->my_fd, buffer, bytes_read)) <= 0) {
+   while ((bytes_read = read(pf->other_fd, buffer, sizeof(buffer))) >= 0 ) {
+      if ((bytes_written = write(pf->my_fd, buffer, bytes_read)) < 0) {
           break;
         }
         memset(buffer, 0, 65535);
-    }
   }
-
   close(pf->my_fd);
   close(pf->other_fd);
   pthread_exit(NULL);
@@ -276,17 +275,17 @@ void handle_proxy_request(int fd) {
   target_struct->other_fd = fd;
 
   struct proxy_fd *client_struct = malloc(sizeof(struct proxy_fd));
-  target_struct->my_fd = fd;
-  target_struct->other_fd = target_fd;
+  client_struct->my_fd = fd;
+  client_struct->other_fd = target_fd;
 
   pthread_create(&target_id, NULL, run_socket, (void *) target_struct);
   pthread_create(&client_id, NULL, run_socket, (void *) client_struct);
 
-  pthread_join(target_id, NULL);
   pthread_join(client_id, NULL);
+  pthread_join(target_id, NULL);
 
-  free(target_struct);
   free(client_struct);
+  free(target_struct);
 
   /* PART 4 END */
 
