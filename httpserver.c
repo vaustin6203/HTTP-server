@@ -193,12 +193,13 @@ void *run_socket(void *arg) {
   while ((bytes_read = read(pf->other_fd, buffer, sizeof(buffer))) > 0 ) {
     if (bytes_read > 0) {
         if ((bytes_written = write(pf->my_fd, buffer, bytes_read)) < 0) {
-          close(pf->my_fd);
-          close(pf->other_fd);
-          pthread_exit();
+          break;
         }
     }
   }
+  close(pf->my_fd);
+  close(pf->other_fd);
+  pthread_exit(NULL);
 }
 
 /*
@@ -265,8 +266,8 @@ void handle_proxy_request(int fd) {
 
   /* TODO: PART 4 */
   /* PART 4 BEGIN */
-  pid_t target_id;
-  pid_t client_id;
+  pthread_t target_id;
+  pthread_t client_id;
 
   struct proxy_fd *target_struct = malloc(sizeof(struct proxy_fd));
   target_struct->my_fd = target_fd;
@@ -277,10 +278,13 @@ void handle_proxy_request(int fd) {
   target_struct->other_fd = target_fd;
 
   pthread_create(&target_id, NULL, run_socket, (void *) target_struct);
-  pthread_create(&client_id, NULL, run_socet, (void *) client_struct);
+  pthread_create(&client_id, NULL, run_socket, (void *) client_struct);
 
   pthread_join(target_id, NULL);
   pthread_join(client_id, NULL);
+
+  free(target_struct);
+  free(client_struct);
 
   /* PART 4 END */
 
