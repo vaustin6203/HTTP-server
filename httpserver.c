@@ -56,7 +56,7 @@ void serve_file(int fd, char *path, off_t file_size) {
   http_send_header(fd, "Content-Length", str_length); // TODO: change this line too
   http_end_headers(fd);
 
-  //buffer[bytes_read] = '\0';
+  buffer[bytes_read] = '\0';
   write(fd, buffer, bytes_read);
   
   /* PART 2 END */
@@ -192,11 +192,13 @@ void *run_socket(void *arg) {
 
   while ((bytes_read = read(pf->other_fd, buffer, sizeof(buffer))) > 0 ) {
     if (bytes_read > 0) {
-        if ((bytes_written = write(pf->my_fd, buffer, bytes_read)) < 0) {
+        if ((bytes_written = write(pf->my_fd, buffer, bytes_read)) <= 0) {
           break;
         }
+        memset(buffer, 0, 65535);
     }
   }
+
   close(pf->my_fd);
   close(pf->other_fd);
   pthread_exit(NULL);
